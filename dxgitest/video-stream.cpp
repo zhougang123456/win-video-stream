@@ -37,9 +37,22 @@ VideoStream::VideoStream()
 }
 
 VideoStream::~VideoStream()
-{
-	m_candidate.clear();
-	m_stream.clear();
+{	
+	Candidates::iterator candidate_iter;
+	for (candidate_iter = m_candidate.begin(); candidate_iter != m_candidate.end(); )
+	{
+		Candidate* candidate = (Candidate*)* candidate_iter;
+		candidate_iter = m_candidate.erase(candidate_iter);
+		free(candidate);
+	}
+	Streams::iterator stream_iter;
+	for (stream_iter = m_stream.begin(); stream_iter != m_stream.end(); )
+	{	
+		Stream* stream = (Stream*)* stream_iter;
+		stream_iter = m_stream.erase(stream_iter);
+		free(stream);
+	}
+	
 }
 
 bool VideoStream::Is_StreamStart(RECT* rect, INT32 time)

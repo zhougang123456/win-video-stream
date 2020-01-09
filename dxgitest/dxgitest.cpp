@@ -256,7 +256,7 @@ BOOL QueryFrame()
 			/*printf("%d i: left %d right %d top %d bottom %d",
 				i, dirtyRects[i].left, dirtyRects[i].right, dirtyRects[i].top, dirtyRects[i].bottom);*/
 			
-			if (m_videoStream->Is_StreamStart(&dirtyRects[i], time))
+			if (m_videoStream != nullptr && m_videoStream->Is_StreamStart(&dirtyRects[i], time))
 			{
 				printf("is stream start!\n");
 			}
@@ -265,6 +265,7 @@ BOOL QueryFrame()
 			}
 		}
 		delete[] MetaDataBuffer;
+
 	}
 	return true;
 	
