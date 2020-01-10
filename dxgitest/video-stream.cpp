@@ -55,7 +55,7 @@ VideoStream::~VideoStream()
 	
 }
 
-bool VideoStream::Is_StreamStart(RECT* rect, INT32 time)
+void VideoStream::Add_Stream(RECT* rect, INT32 time)
 {
 	bool Is_Candidate = false;
 	if ((rect->right - rect->left) * (rect->bottom - rect->top) > STREAM_MIN_SIZE)
@@ -144,12 +144,36 @@ bool VideoStream::Is_StreamStart(RECT* rect, INT32 time)
 		}
 	}
 
+}
+
+bool VideoStream::Is_StreamStart(void)
+{
+	
 	//printf("m_stream size %d \n", (int)m_stream.size());
 	if (m_stream.empty()) {
 		return false;
 	}
-
 	return true;
+}
+
+void VideoStream::Stream_Timeout(INT32 time)
+{
+	Streams::iterator stream_iter;
+	for (stream_iter = m_stream.begin();
+		stream_iter != m_stream.end(); )
+	{
+		Stream* stream = (Stream*)* stream_iter;
+		if (time - stream->time > MAX_STREAM_DETECT_TIME)
+		{
+			Set_StreamId(stream->id, false);
+			stream_iter = m_stream.erase(stream_iter);
+			free(stream);
+		}
+		else
+		{
+			stream_iter++;
+		}
+	}
 }
 
 INT32 VideoStream::Get_StreamId()

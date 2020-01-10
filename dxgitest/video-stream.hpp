@@ -26,7 +26,9 @@ class VideoStream
 public:
 	VideoStream();
 	~VideoStream();
-	bool Is_StreamStart(RECT* rect, INT32 time);
+	void Add_Stream(RECT* rect, INT32 time);
+	bool Is_StreamStart(void);
+	void Stream_Timeout(INT32 time);
 
 private:
 	Candidates m_candidate;

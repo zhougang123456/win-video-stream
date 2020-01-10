@@ -187,7 +187,19 @@ BOOL QueryFrame()
 		return FALSE;
 	}
 
+	INT32 time = (INT32)get_time() / 1000;
 
+	if (m_videoStream != nullptr) {
+		m_videoStream->Stream_Timeout(time);
+		if (m_videoStream->Is_StreamStart()) {
+			printf("is stream start!\n");
+		}
+		else
+		{
+			printf("is stream stop!\n");
+		}
+	}
+	
 	IDXGIResource* hDesktopResource = NULL;
 	DXGI_OUTDUPL_FRAME_INFO FrameInfo;
 	m_hDeskDupl->ReleaseFrame();
@@ -250,19 +262,17 @@ BOOL QueryFrame()
 		INT DirtyCount = BufSize / sizeof(RECT);
 		//printf("count %d \n", DirtyCount);
 		RECT* dirtyRects = reinterpret_cast<RECT*>(DirtyRects);
-		INT32 time = (INT32)get_time() / 1000;
+		
 		for (int i = 0; i < DirtyCount; i++) 
 		{	
 			/*printf("%d i: left %d right %d top %d bottom %d",
 				i, dirtyRects[i].left, dirtyRects[i].right, dirtyRects[i].top, dirtyRects[i].bottom);*/
 			
-			if (m_videoStream != nullptr && m_videoStream->Is_StreamStart(&dirtyRects[i], time))
-			{
-				printf("is stream start!\n");
+			if (m_videoStream != nullptr)
+			{	
+				m_videoStream->Add_Stream(&dirtyRects[i], time);
 			}
-			else {
-				printf("is stream stop!\n");
-			}
+			
 		}
 		delete[] MetaDataBuffer;
 
