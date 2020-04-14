@@ -259,6 +259,79 @@ BOOL QueryFrame()
 			}
 			return hr;
 		}
+
+		D3D11_TEXTURE2D_DESC frameDescriptor;
+		hAcquiredDesktopImage->GetDesc(&frameDescriptor);
+
+		//
+		// create a new staging buffer for fill frame image
+		//
+		ID3D11Texture2D* hNewDesktopImage = NULL;
+		frameDescriptor.Usage = D3D11_USAGE_STAGING;
+		frameDescriptor.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		frameDescriptor.BindFlags = 0;
+		frameDescriptor.MiscFlags = 0;
+		frameDescriptor.MipLevels = 1;
+		frameDescriptor.ArraySize = 1;
+		frameDescriptor.SampleDesc.Count = 1;
+		frameDescriptor.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		hr = m_hDevice->CreateTexture2D(&frameDescriptor, NULL, &hNewDesktopImage);
+		if (FAILED(hr))
+		{
+			RESET_OBJECT(hAcquiredDesktopImage);
+			m_hDeskDupl->ReleaseFrame();
+			return FALSE;
+		}
+
+		//
+		// copy next staging buffer to new staging buffer
+		//
+		m_hContext->CopyResource(hNewDesktopImage, hAcquiredDesktopImage);
+
+		RESET_OBJECT(hAcquiredDesktopImage);
+		m_hDeskDupl->ReleaseFrame();
+
+		//
+		// create staging buffer for map bits
+		//
+		IDXGISurface* hStagingSurf = NULL;
+		hr = hNewDesktopImage->QueryInterface(__uuidof(IDXGISurface), (void**)(&hStagingSurf));
+		RESET_OBJECT(hNewDesktopImage);
+		if (FAILED(hr))
+		{
+			return FALSE;
+		}
+		DXGI_SURFACE_DESC hStagingSurfDesc;
+		// BGRA8
+		hStagingSurf->GetDesc(&hStagingSurfDesc);
+		//
+		// copy bits to user space
+		//
+		DXGI_MAPPED_RECT mappedRect;
+		hr = hStagingSurf->Map(&mappedRect, DXGI_MAP_READ);
+		int imgSize = iWidth * iHeight * 4;
+
+		unsigned char* pImgData = new unsigned char[imgSize];
+
+		if (SUCCEEDED(hr))
+		{
+			for (int i = 0; i < iHeight; i++) {
+
+
+				memcpy((BYTE*)pImgData + i * iWidth * 32 / 8,
+					(BYTE*)mappedRect.pBits + i * mappedRect.Pitch,
+					iWidth * 32 / 8);
+
+
+			}
+
+			hStagingSurf->Unmap();
+		}
+		else {
+			printf("failed.\n");
+		}
+
+		INT Pitch = iWidth * 4;
 		INT DirtyCount = BufSize / sizeof(RECT);
 		//printf("count %d \n", DirtyCount);
 		RECT* dirtyRects = reinterpret_cast<RECT*>(DirtyRects);
@@ -268,14 +341,42 @@ BOOL QueryFrame()
 			/*printf("%d i: left %d right %d top %d bottom %d",
 				i, dirtyRects[i].left, dirtyRects[i].right, dirtyRects[i].top, dirtyRects[i].bottom);*/
 			
+			UINT32 width = dirtyRects[i].right - dirtyRects[i].left;
+			UINT32 height = dirtyRects[i].bottom - dirtyRects[i].top;
+
+			UINT32 line_size = width * 4;
+			size_t alloc_size = height * line_size;
+			POINT sourcePoint;
+			sourcePoint.x = dirtyRects[i].left;
+			sourcePoint.y = dirtyRects[i].top;
+
+			BYTE* src = (BYTE*)pImgData + sourcePoint.y * Pitch + sourcePoint.x * 4;
+			BYTE* src_end = src - Pitch;
+			src += Pitch * (height - 1);
+
+			Drawable drawable;
+			drawable.width = width;
+			drawable.height = height;
+			drawable.bpp = 4;
+			drawable.data = new BYTE[alloc_size];
+
+			for (int j = 0; j < height, src != src_end; src -= Pitch, ++j)
+			{
+				memcpy((BYTE*)drawable.data + j * line_size, src, line_size);
+			}
 			if (m_videoStream != nullptr)
 			{	
-				m_videoStream->Add_Stream(&dirtyRects[i], time);
+				m_videoStream->Add_Stream(&dirtyRects[i], time, NULL);
 			}
-			
+			delete[] drawable.data;
 		}
-		delete[] MetaDataBuffer;
 
+		
+		
+		RESET_OBJECT(hStagingSurf);
+		delete[] pImgData;
+		delete[] MetaDataBuffer;
+		
 	}
 	return true;
 	
