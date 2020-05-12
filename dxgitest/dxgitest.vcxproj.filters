@@ -21,9 +21,57 @@
     <ClCompile Include="video-stream.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="glz-encoder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="image-encoders.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="drawable.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="glz-encoder-dict.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="zlib-encoder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="jpeg-encoder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="video-stream.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="glz-encoder.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="image-encoders.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="macros.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ring.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="drawable.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="lz-common.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="bitmap.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="glz-encoder-dict.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="zlib-encoder.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="jpeg-encoder.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

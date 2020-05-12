@@ -119,7 +119,7 @@ static GradualType get_graduality_level(Drawable* drawable)
 	BYTE* last_line = lines + (num_lines - 1) * width * bpp;
 	int num_samples;
 	double samples_sum_score;
-	if ((width <= 1) || (num_lines <= 1)) {
+	if ((width <= 1) || (num_lines <= 1) || (bpp <= 2 )) {
 		num_samples = 1;
 		samples_sum_score = 1.0;
 		goto end;

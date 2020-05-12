@@ -1,7 +1,6 @@
-#pragma once
 #include <list>
 #include "D3D11.h"
-#define STREAM_START_CONDITION 10
+#define STREAM_START_CONDITION 20
 #define GRADUAL_FRAME_CONDITION 0.2
 #define STREAM_FRAMES_RESET_CONDITION 100
 #define MAX_DETECT_TIME 200
