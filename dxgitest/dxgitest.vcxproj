@@ -161,6 +161,7 @@
     <ClCompile Include="glz-encoder.cpp" />
     <ClCompile Include="image-encoders.cpp" />
     <ClCompile Include="jpeg-encoder.cpp" />
+    <ClCompile Include="openh264-encoder.cpp" />
     <ClCompile Include="video-stream.cpp" />
     <ClCompile Include="zlib-encoder.cpp" />
   </ItemGroup>
@@ -173,6 +174,7 @@
     <ClInclude Include="lz-common.hpp" />
     <ClInclude Include="macros.hpp" />
     <ClInclude Include="drawable.hpp" />
+    <ClInclude Include="openh264-encoder.hpp" />
     <ClInclude Include="ring.hpp" />
     <ClInclude Include="video-stream.hpp" />
     <ClInclude Include="zlib-encoder.hpp" />

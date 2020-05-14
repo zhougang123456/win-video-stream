@@ -8,7 +8,7 @@
 //#include "DXGICaptor.h"
 #include "video-stream.hpp"
 #include "image-encoders.hpp"
-
+#include "openh264-encoder.hpp"
 #define MIN_GLZ_WINDOW_SIZE_DEFAULT (1024 * 1024 * 12)
 
 
@@ -25,7 +25,7 @@ int iWidth = 0;
 int iHeight = 0;
 static ImageEncoders* encoder;
 static ImageEncoderSharedData shared_data;
-
+static Openh264Encoder* openh264encoder;
 static inline uint64_t get_time()
 {
 	time_t clock;
@@ -159,7 +159,7 @@ BOOL Init()
 	encoder->image_encoders_init(&shared_data);
 	encoder->image_encoders_get_glz_dictionary(0, MIN_GLZ_WINDOW_SIZE_DEFAULT / 4);
 	encoder->image_encoders_glz_create(0);
-
+	
 	return TRUE;
 
 }
@@ -191,7 +191,7 @@ BOOL AttatchToThread(VOID)
 	return bDesktopAttached;
 }
 
-#define DUMP_JPEG
+//#define DUMP_JPEG
 #ifdef DUMP_JPEG
 static int jpeg_id = 0;
 static void dump_jpeg(RedCompressBuf* buf, int data_size)
@@ -234,9 +234,16 @@ BOOL QueryFrame()
 		m_videoStream->Stream_Timeout(time);
 		if (m_videoStream->Is_StreamStart()) {
 			//printf("is stream start!\n");
+			if (!openh264encoder) {
+				openh264encoder = new Openh264Encoder();
+				openh264encoder->init(iWidth, iHeight);
+			}
+			
 		}
 		else
-		{
+		{	
+			delete openh264encoder;
+			openh264encoder = NULL;
 			//printf("is stream stop!\n");
 		}
 	}
@@ -373,6 +380,19 @@ BOOL QueryFrame()
 			return FALSE;
 		}
 
+		if (openh264encoder) {
+			int i420Size = iWidth * iHeight * 3 / 2;
+			unsigned char* i420 = new unsigned char[i420Size];
+
+			openh264encoder->rgba_convert_i420(pImgData, i420, iWidth, iHeight);
+			openh264encoder->encode(i420);
+
+			delete[] i420;
+		} else {
+
+		}
+		
+
 		INT Pitch = iWidth * 4;
 		INT DirtyCount = BufSize / sizeof(RECT);
 		//printf("count %d \n", DirtyCount);
@@ -396,54 +416,58 @@ BOOL QueryFrame()
 			BYTE* src_end = src - Pitch;
 			src += Pitch * (height - 1);
 
-			Drawable drawable;
-			drawable.width = width;
-			drawable.height = height;
-			drawable.bpp = 4;
-			drawable.data = new BYTE[alloc_size];
+			if (!openh264encoder) {
 
-			for (int j = 0; j < height, src != src_end; src -= Pitch, ++j)
-			{
-				memcpy((BYTE*)drawable.data + j * line_size, src, line_size);
-			}
-			SpiceRect rect;
-			rect.left = dirtyRects[i].left; rect.right = dirtyRects[i].right;
-			rect.top = dirtyRects[i].top; rect.bottom = dirtyRects[i].bottom;
-			RedDrawable *red_drawable = (RedDrawable *)malloc(sizeof(RedDrawable));
-			memset(red_drawable, 0, sizeof(RedDrawable));
-			red_drawable_get(red_drawable, &rect, drawable.data, 0);
-			SpiceImage* simage = red_drawable->u.copy.src_bitmap;
-			SpiceBitmap* src_bitmap = &simage->u.bitmap;
-			SpiceImage* dest_image = (SpiceImage *)malloc(sizeof(SpiceImage));
-			dest_image->descriptor = simage->descriptor;
-			dest_image->descriptor.flags = 0;
-			compress_send_data_t comp_send_data = { 0 };
-			//encoder->image_encoders_compress_glz(dest_image, src_bitmap, red_drawable, NULL, &comp_send_data);
-			encoder->image_encoders_compress_jpeg(dest_image, src_bitmap, &comp_send_data);
+				Drawable drawable;
+				drawable.width = width;
+				drawable.height = height;
+				drawable.bpp = 4;
+				drawable.data = new BYTE[alloc_size];
+
+				for (int j = 0; j < height, src != src_end; src -= Pitch, ++j)
+				{
+					memcpy((BYTE*)drawable.data + j * line_size, src, line_size);
+				}
+
+				SpiceRect rect;
+				rect.left = dirtyRects[i].left; rect.right = dirtyRects[i].right;
+				rect.top = dirtyRects[i].top; rect.bottom = dirtyRects[i].bottom;
+				RedDrawable* red_drawable = (RedDrawable*)malloc(sizeof(RedDrawable));
+				memset(red_drawable, 0, sizeof(RedDrawable));
+				red_drawable_get(red_drawable, &rect, drawable.data, 0);
+				SpiceImage* simage = red_drawable->u.copy.src_bitmap;
+				SpiceBitmap* src_bitmap = &simage->u.bitmap;
+				SpiceImage* dest_image = (SpiceImage*)malloc(sizeof(SpiceImage));
+				dest_image->descriptor = simage->descriptor;
+				dest_image->descriptor.flags = 0;
+				compress_send_data_t comp_send_data = { 0 };
+				encoder->image_encoders_compress_glz(dest_image, src_bitmap, red_drawable, NULL, &comp_send_data);
+				//encoder->image_encoders_compress_jpeg(dest_image, src_bitmap, &comp_send_data);
 #ifdef DUMP_JPEG
-			dump_jpeg(comp_send_data.comp_buf, comp_send_data.comp_buf_size);
+				dump_jpeg(comp_send_data.comp_buf, comp_send_data.comp_buf_size);
 #endif
-			static INT32 sum = 0;
-			sum += comp_send_data.comp_buf_size;
-			printf("glz size %d\n", comp_send_data.comp_buf_size);
-			if ((INT32)get_time() / 1000 - start > 50000) {
-				printf("glz size sum %d\n", sum);
-				start = (INT32)get_time() / 1000;
-				sum = 0;
+				static INT32 sum = 0;
+				sum += comp_send_data.comp_buf_size;
+				printf("glz size %d\n", comp_send_data.comp_buf_size);
+				if ((INT32)get_time() / 1000 - start > 50000) {
+					printf("glz size sum %d\n", sum);
+					start = (INT32)get_time() / 1000;
+					sum = 0;
+				}
+
+				red_drawable_unref(red_drawable);
+
+				RedCompressBuf* buf = comp_send_data.comp_buf;
+				RedCompressBuf* next = buf;
+				while (next) {
+					next = buf->send_next;
+					free(buf);
+					buf = next;
+				}
+
+				free(dest_image);
 			}
 			
-			red_drawable_unref(red_drawable);
-
-			RedCompressBuf* buf = comp_send_data.comp_buf;
-			RedCompressBuf* next = buf;
-			while (next) {
-				next = buf->send_next;
-				free(buf);
-				buf = next;
-			}
-			
-			free(dest_image);
-
 			if (m_videoStream != nullptr)
 			{	
 				m_videoStream->Add_Stream(&dirtyRects[i], time, NULL);

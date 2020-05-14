@@ -39,6 +39,9 @@
     <ClCompile Include="jpeg-encoder.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="openh264-encoder.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="video-stream.hpp">
@@ -72,6 +75,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="jpeg-encoder.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="openh264-encoder.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
