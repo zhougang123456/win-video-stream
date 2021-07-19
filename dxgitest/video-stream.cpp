@@ -10,8 +10,8 @@
 #define GRADUAL_HIGH_RGB24_TH -0.03
 // setting a more permissive threshold for stream identification in order
 // not to miss streams that were artificially scaled on the guest (e.g., full screen view
-// in window media player 12). see red_stream_add_frame
-#define GRADUAL_MEDIUM_SCORE_TH 0.002
+// in window media player 12). 
+#define GRADUAL_MEDIUM_SCORE_TH 0.050
 
 typedef enum {
 	GRADUAL_INVALID,
@@ -54,6 +54,15 @@ static void Copy_Rect(RECT* dest, RECT* src)
 	dest->top = src->top;
 	dest->bottom = src->bottom;
 }
+
+static inline int rect_get_area(RECT* rect)
+{
+	return (rect->right - rect->left) * (rect->bottom - rect->top);
+}
+
+//static inline void print_rect(RECT* rect) {
+//	printf("rect left %d, right %d, top %d, bottom %d\n", rect->left, rect->right, rect->top, rect->bottom);
+//}
 
 static inline int pixelcmp (BYTE* p1, BYTE* p2)
 {
@@ -184,132 +193,105 @@ VideoStream::~VideoStream()
 
 void VideoStream::Add_Stream(RECT* rect, INT32 time, Drawable* drawable)
 {
-	bool Is_Candidate = false;
-	bool Is_Gradual = false;
-	if ((rect->right - rect->left) * (rect->bottom - rect->top) > STREAM_MIN_SIZE)
-	{
-		Is_Candidate = true;
-		if (drawable == NULL) {
-			Is_Gradual = true;
-		}
-		else {
-			Is_Gradual = get_graduality_level(drawable) > GRADUAL_LOW ? true : false;
-		}
-		/*if (Is_Gradual) {
-			printf("is gradual\n");
-		}
-		else {
-			printf("is not gradual\n");
-		}*/
+	if ((rect->right - rect->left) * (rect->bottom - rect->top) < STREAM_MIN_SIZE)
+	{	
+		return;
 	}
+
 	Streams::iterator stream_iter;
 	for (stream_iter = m_stream.begin();
 		stream_iter != m_stream.end(); )
 	{
 		Stream* stream = (Stream*)* stream_iter;
 		if (time - stream->time > MAX_STREAM_DETECT_TIME)
-		{
+		{	
 			Set_StreamId(stream->id, false);
 			stream_iter = m_stream.erase(stream_iter);
 			free(stream);
 		}
-		else if (Is_Candidate && Rect_Is_Contain(rect, &stream->rect))
+		else if (Is_Next_Frame(&stream->rect, rect))
 		{
 			stream->time = time;
-			stream_iter++;
+			return;
 		}
 		else
 		{
 			stream_iter++;
 		}
 	}
-	if (Is_Candidate && m_candidate.empty())
+	Candidates::iterator candidate_iter;
+	bool Is_Gradual = false;
+	bool Is_Stream = false;
+	for (candidate_iter = m_candidate.begin();
+		candidate_iter != m_candidate.end(); )
 	{
-
+		Candidate* candidate = reinterpret_cast<Candidate*>(*candidate_iter);
+		if (time - candidate->time > MAX_DETECT_TIME)
+		{
+			//printf("m_candidate size %d \n", (int)m_candidate.size());
+			candidate_iter = m_candidate.erase(candidate_iter);
+			free(candidate);
+		}
+		else if (Is_Next_Frame(&candidate->rect, rect))
+		{	
+			if (drawable == NULL) {
+				Is_Gradual = true;
+			}
+			else {
+				Is_Gradual = get_graduality_level(drawable) > GRADUAL_LOW ? true : false;
+			}
+			Is_Stream = true;
+			candidate->count++;
+			candidate->time = time;
+			if (Is_Gradual) {
+				if (candidate->count - candidate->last_count > STREAM_FRAMES_RESET_CONDITION) {
+					candidate->count = 1;
+					candidate->gradual_count = 1;
+				}
+				else {
+					candidate->gradual_count++;
+				}
+				candidate->last_count = candidate->count;
+			}
+			
+			if (candidate->count >= STREAM_START_CONDITION && 
+				candidate->gradual_count >= candidate->count * GRADUAL_FRAME_CONDITION)
+			{
+				if (Get_StreamId() >= 0) {
+					Stream* stream = (Stream*)malloc(sizeof(Stream));
+					Copy_Rect(&stream->rect, rect);
+					stream->time = time;
+					stream->id = Get_StreamId();
+					Set_StreamId(stream->id, true);
+					m_stream.push_back(stream);
+				}
+				candidate_iter = m_candidate.erase(candidate_iter);
+				free(candidate);
+			}
+			else {
+				candidate_iter++;
+			}
+		}
+		else {
+			candidate_iter++;
+		}
+		//printf("m_candidate size %d \n", (int)m_candidate.size());
+	}
+	if (!Is_Stream)
+	{
 		Candidate* candidate = (Candidate*)malloc(sizeof(Candidate));
 		Copy_Rect(&candidate->rect, rect);
 		candidate->time = time;
 		candidate->count = 1;
 		if (Is_Gradual) {
 			candidate->gradual_count = 1;
-			candidate->last_count = candidate->count;
 		}
 		else {
 			candidate->gradual_count = 0;
 		}
+		candidate->last_count = candidate->count;
 		m_candidate.push_back(candidate);
-		//m_candidate.remove(candidate);
 	}
-	else
-	{
-		Candidates::iterator candidate_iter;
-		bool Is_Stream = false;
-		for (candidate_iter = m_candidate.begin();
-			candidate_iter != m_candidate.end(); )
-		{
-			Candidate* candidate = reinterpret_cast<Candidate*>(*candidate_iter);
-			if (time - candidate->time > MAX_DETECT_TIME)
-			{
-				//printf("m_candidate size %d \n", (int)m_candidate.size());
-				candidate_iter = m_candidate.erase(candidate_iter);
-				free(candidate);
-			}
-			else if (Is_Candidate && Rect_Is_Equal(rect, &candidate->rect))
-			{
-				Is_Stream = true;
-				candidate->count++;
-				candidate->time = time;
-				if (Is_Gradual) {
-					if (candidate->count - candidate->last_count > STREAM_FRAMES_RESET_CONDITION) {
-						candidate->count = 1;
-						candidate->gradual_count = 1;
-					}
-					else {
-						candidate->gradual_count++;
-					}
-					candidate->last_count = candidate->count;
-				}
-				
-				if (candidate->count >= STREAM_START_CONDITION && 
-					candidate->gradual_count >= candidate->count * GRADUAL_FRAME_CONDITION)
-				{
-					if (Get_StreamId() >= 0) {
-						Stream* stream = (Stream*)malloc(sizeof(Stream));
-						Copy_Rect(&stream->rect, rect);
-						stream->time = time;
-						stream->id = Get_StreamId();
-						Set_StreamId(stream->id, true);
-						m_stream.push_back(stream);
-					}
-					candidate_iter = m_candidate.erase(candidate_iter);
-					free(candidate);
-				}
-				else {
-					candidate_iter++;
-				}
-			}
-			else {
-				candidate_iter++;
-			}
-			//printf("m_candidate size %d \n", (int)m_candidate.size());
-		}
-		if (Is_Candidate && !Is_Stream)
-		{
-			Candidate* candidate = (Candidate*)malloc(sizeof(Candidate));
-			Copy_Rect(&candidate->rect, rect);
-			candidate->time = time;
-			candidate->count = 1;
-			if (Is_Gradual) {
-				candidate->gradual_count = 1;
-				candidate->last_count = candidate->count;
-			}
-			else {
-				candidate->gradual_count = 0;
-			}
-			m_candidate.push_back(candidate);
-		}
-	}
-
 }
 
 bool VideoStream::Is_StreamStart(void)
@@ -330,7 +312,7 @@ void VideoStream::Stream_Timeout(INT32 time)
 	{
 		Stream* stream = (Stream*)* stream_iter;
 		if (time - stream->time > MAX_STREAM_DETECT_TIME)
-		{
+		{	
 			Set_StreamId(stream->id, false);
 			stream_iter = m_stream.erase(stream_iter);
 			free(stream);
@@ -374,4 +356,20 @@ INT32 VideoStream::Get_StreamId()
 void VideoStream::Set_StreamId(INT32 id, bool allowed)
 {
 	m_stream_id[id] = allowed;
+}
+
+bool VideoStream::Is_Next_Frame(RECT* rect1, RECT* rect2)
+{	
+	if (!Rect_Is_Contain(rect1, rect2) && !Rect_Is_Contain(rect2, rect1)) {
+		return false;
+	}
+	int candidate_area = rect_get_area(rect1);
+	int other_area = rect_get_area(rect2);
+	
+	if (candidate_area > 1.5 * other_area || other_area > 1.5 * candidate_area) {
+	
+		return false;
+	}
+
+	return true;
 }

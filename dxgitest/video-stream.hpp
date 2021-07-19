@@ -1,6 +1,6 @@
 #include <list>
 #include "D3D11.h"
-#define STREAM_START_CONDITION 20
+#define STREAM_START_CONDITION 15
 #define GRADUAL_FRAME_CONDITION 0.2
 #define STREAM_FRAMES_RESET_CONDITION 100
 #define MAX_DETECT_TIME 200
@@ -50,6 +50,7 @@ private:
 	bool m_stream_id[MAX_STREAMS];
 	INT32 Get_StreamId();
 	void Set_StreamId(INT32 id, bool allowed);
+	bool Is_Next_Frame(RECT* rect1, RECT* rect2);
 };
 
 
